@@ -11,8 +11,9 @@ This repository exists to make that mechanism **easy to understand and easy to t
 | [`1-simple/`](1-simple/)   | the bare pass-through path | `zcompress_*` → host **zlib** |
 | [`2-callback/`](2-callback/) | host→guest **callbacks** (reentry) | `my_qsort` / `my_bsearch` → host **qsort/bsearch** |
 | [`3-minizip/`](3-minizip/) | a **whole library**, auto-generated | drop-in **`libz.so`** → host **zlib** (runs a stock `minizip`) |
+| [`4-graphics/`](4-graphics/) | **two** libraries at once, a live GUI | drop-in **`libX11.so` + `libGL.so`** → host Xlib/OpenGL |
 
-Start with `1-simple`, then `2-callback`, then `3-minizip`.
+Start with `1-simple`, then `2-callback`, then `3-minizip`, then `4-graphics`.
 
 ---
 
@@ -189,6 +190,27 @@ cd 3-minizip
 Crucially, layer 3 adds **no new runtime** — it reuses `2-callback`'s `GuestRuntime`, `HostRuntime`, and the `Invocation` coroutine verbatim. Most of zlib (~80 functions) is pure data pass-through; the one function with host→guest callbacks, `inflateBack`, reuses the reentry loop. Its `in`/`out` callbacks are wrapped in a trampoline only when they are *guest* pointers — the adapter compares against `qemu_address` (the guest/host address-space boundary) and calls a host function pointer directly.
 
 <!-- Two things are deliberately out of scope — documented, not silently broken: the variadic `gzprintf`/`gzvprintf` (a generic marshaller can't forward varargs), and custom `z_stream` allocators (`zalloc`/`zfree` are assumed `Z_NULL`, so the host's default allocator is used). -->
+
+---
+
+## Two libraries and a live GUI (`4-graphics`)
+
+Layer 3 redirected one batch library. Layer 4 does **two libraries at once — and a live, interactive window**: a small OpenGL program whose Xlib *and* OpenGL/GLX calls all run on the host.
+
+[`Program.cpp`](4-graphics/guest/Program.cpp) is a self-contained GLX + immediate-mode GL demo — glowing, spinning torus knots over a starfield. It opens a window with Xlib and draws with OpenGL, but it is built against **drop-in `libX11.so` and `libGL.so`**, so every `XCreateWindow`, `glBegin`, `glXSwapBuffers`, … is forwarded to the host's real Xlib/OpenGL and rendered on the host display.
+
+```sh
+cd 4-graphics
+./build.sh                  # guest: libX11.so + libGL.so + Program; host: the two adapter libs
+./run.sh                    # runs the program under QEMU
+```
+
+The same [`GenerateSource.py`](4-graphics/GenerateSource.py) produces **both** thunk pairs — one per `*Symbols.conf` — and reuses the `2-callback` runtime unchanged. Every function the program uses is **pure data pass-through** (no callbacks, no varargs), so this layer is mechanically the simplest: the generator emits one stub and one adapter per symbol, nothing more.
+
+What lets an unmodified windowing toolkit survive this is the shared address space:
+
+* Xlib's **macros** (`DefaultScreen`, `RootWindow`) and **struct fields** (`XVisualInfo`, `XEvent`) are read by the guest straight out of the host-owned structs — there is no symbol to thunk.
+* **Opaque host handles** — a `Display *`, an `XVisualInfo *`, a `GLXContext` — flow between the `libX11` and `libGL` thunks as plain values the guest never dereferences.
 
 <!-- --- -->
 
