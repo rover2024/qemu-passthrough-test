@@ -34,7 +34,7 @@ set_target_properties(ZlibThunk
 )
 add_custom_command(
     TARGET ZlibThunk POST_BUILD
-    COMMAND ln -s $<TARGET_FILE:ZlibThunk> $<TARGET_FILE:ZlibThunk>.1
+    COMMAND ln -sf $<TARGET_FILE:ZlibThunk> $<TARGET_FILE:ZlibThunk>.1
 )
 
 # set(MINIZIP_BUILD_STATIC FALSE)
