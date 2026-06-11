@@ -66,7 +66,7 @@ docker build -f docker/Dockerfile -t passthrough-image .
 
 Run container:
 ```bash
-docker run --rm -it --name passthrough-container passthrough-image
+docker run --rm -it --name passthrough-container passthrough-image /bin/bash
 ```
 
 `QEMU_BUILD_DIR` will be set automatically in the container.

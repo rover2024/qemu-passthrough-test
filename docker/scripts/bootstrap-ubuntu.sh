@@ -4,8 +4,8 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 # Uncomment if you are in PRC region to speed up the download of packages
-#sed -i 's@http://archive.ubuntu.com/ubuntu/@http://mirrors.ustc.edu.cn/ubuntu/@g' /etc/apt/sources.list
-#sed -i 's@http://security.ubuntu.com/ubuntu/@http://mirrors.ustc.edu.cn/ubuntu/@g' /etc/apt/sources.list
+sed -i 's@http://archive.ubuntu.com/ubuntu/@http://mirrors.ustc.edu.cn/ubuntu/@g' /etc/apt/sources.list
+sed -i 's@http://security.ubuntu.com/ubuntu/@http://mirrors.ustc.edu.cn/ubuntu/@g' /etc/apt/sources.list
 
 apt-get clean
 apt-get update
@@ -34,15 +34,6 @@ apt-get install -y --no-install-recommends \
     bison \
     patchelf
 
-# install llvm
-apt-get install -y --no-install-recommends \
-    lsb-release \
-    software-properties-common \
-    gnupg
-wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh
-chmod +x /tmp/llvm.sh
-/tmp/llvm.sh 20
-
 # install dependencies for qemu
 apt-get install -y --no-install-recommends \
     python3-tomli \
@@ -58,14 +49,10 @@ apt-get install -y --no-install-recommends \
 
 # install dependencies for lorelei
 apt-get install -y --no-install-recommends \
-    libffcall-dev \
-    libclang-20-dev \
     libx11-dev \
     libx11-xcb-dev \
     libxext-dev \
-    vulkan-tools libvulkan-dev \
     libgl1-mesa-dev libglew-dev libglfw3-dev \
-    libzstd-dev \
     minizip
 
 # create user
@@ -81,8 +68,8 @@ fi
 # Fix ownership for interactive demo workflow.
 mkdir -p /home/user
 chown user:user /home/user
-if [ -d /home/user/lorelei-try-patch ]; then
-    chown user:user /home/user/lorelei-try-patch || true
+if [ -d /home/user/qemu-passthrough-test ]; then
+    chown user:user /home/user/qemu-passthrough-test || true
 fi
 
 echo "[bootstrap] done"

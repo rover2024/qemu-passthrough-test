@@ -2,27 +2,18 @@ FROM ubuntu:22.04
 
 SHELL ["/bin/bash", "-lc"]
 
-# Keep script paths stable with README examples.
-COPY docker /tmp/docker
+COPY . /home/user/qemu-passthrough-test
 
-RUN chmod +x /tmp/docker/scripts/*.sh \
-    && /tmp/docker/scripts/bootstrap-ubuntu.sh
+RUN chmod +x /home/user/qemu-passthrough-test/docker/scripts/*.sh \
+    && /home/user/qemu-passthrough-test/docker/scripts/bootstrap-ubuntu.sh
 
-ENV REPOS_DIR=/home/user/repos
-ENV INSTALL_DIR=/home/user/install
-
-RUN mkdir -p /home/user/docker "$REPOS_DIR" "$INSTALL_DIR" \
-    && cp -a /tmp/docker/. /home/user/docker/ \
-    && chown -R user:user /home/user
+RUN chown -R user:user /home/user/qemu-passthrough-test
 
 USER user
-WORKDIR /home/user
+ENV QEMU_BUILD_DIR=/home/user/qemu/build/release
+WORKDIR /home/user/qemu-passthrough-test
 
 # Pre-build everything so test commands can run directly after `docker run`.
-RUN /home/user/docker/scripts/build-qmsetup.sh \
-    && /home/user/docker/scripts/build-qemu.sh \
-    && /home/user/docker/scripts/build-sdl2.sh \
-    && /home/user/docker/scripts/build-vulkan-headers.sh \
-    && /home/user/docker/scripts/build-lorelei.sh
+RUN /home/user/qemu-passthrough-test/docker/scripts/bootstrap-qemu.sh
 
 CMD ["/bin/bash"]

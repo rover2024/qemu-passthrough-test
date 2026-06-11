@@ -2,6 +2,14 @@
 
 `qsort`/`bsearch` take a **comparator** — a function the host routine calls back. Here the comparator lives in the *guest*. So mid-way through a host `qsort`, the host needs to run a guest function and use its result. The host call stack is deep inside `qsort` and cannot simply unwind, so the host **parks its entire call stack on a coroutine** and bounces control back to the guest.
 
+```c++
+void my_qsort(void *base, size_t nmemb, size_t size,
+              int (*compare)(const void *, const void *));
+
+void *my_bsearch(const void *key, const void *base, size_t nmemb, size_t size,
+                 int (*compare)(const void *, const void *));
+```
+
 `InvokeProc` is therefore not a single syscall but a small loop:
 
 ```
