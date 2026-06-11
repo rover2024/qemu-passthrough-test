@@ -29,6 +29,8 @@ A minimal Docker run command for an X11 desktop looks like this:
 docker run --rm -it \
     -e DISPLAY="$DISPLAY" \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -e XAUTHORITY="$XAUTHORITY" \
+    -v "$XAUTHORITY":"$XAUTHORITY" \
     passthrough-image /bin/bash
 ```
 
