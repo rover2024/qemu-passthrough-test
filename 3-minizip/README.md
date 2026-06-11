@@ -6,10 +6,10 @@ The target is the distribution's own `minizip`. We hand it a **drop-in `libz.so`
 
 **The thunks are generated, not written.**
 
-<!-- [`GenerateSource.py`](3-minizip/GenerateSource.py) parses `zlib.h` with clang, reads the symbol list in [`Symbols.conf`](3-minizip/Symbols.conf), and emits both halves in the exact `2-callback` style: -->
+[`GenerateSource.py`](GenerateSource.py) parses `zlib.h`, reads the symbol list in [`Symbols.conf`](Symbols.conf), and emits both halves in the exact `2-callback` style:
 
-* [`guest/ZlibThunk.c`](3-minizip/guest/ZlibThunk.c) — one exported zlib symbol per function; each packs `args[]` and calls `InvokeProc`. Built into `libz.so`.
-* [`host/ZlibThunkHost.cpp`](3-minizip/host/ZlibThunkHost.cpp) — one `__<name>` adapter per function; each unpacks `args[]` and calls the **real** host zlib. Built into `libZlibThunkHost.so` (linked against the real `-lz`).
+* [`guest/ZlibThunk.c`](guest/ZlibThunk.c) — one exported zlib symbol per function; each packs `args[]` and calls `InvokeProc`. Built into `libz.so`.
+* [`host/ZlibThunkHost.cpp`](host/ZlibThunkHost.cpp) — one `__<name>` adapter per function; each unpacks `args[]` and calls the **real** host zlib. Built into `libZlibThunkHost.so` (linked against the real `-lz`).
 
 Crucially, layer 3 adds **no new runtime** — it reuses `2-callback`'s `GuestRuntime`, `HostRuntime`, and the `Invocation` coroutine verbatim. Most of zlib (~80 functions) is pure data pass-through; the one function with host→guest callbacks, `inflateBack`, reuses the reentry loop. Its `in`/`out` callbacks are wrapped in a trampoline only when they are *guest* pointers — the adapter compares against `qemu_address` (the guest/host address-space boundary) and calls a host function pointer directly.
 
@@ -21,6 +21,10 @@ cd 3-minizip
 ./build.sh
 ./run.sh
 ```
+
+By default, `./run.sh` runs the pass-through path: QEMU launches an x86_64 `minizip`, loads the guest `libz.so` thunk, and attaches the `passthrough` plugin. For comparison, `./run.sh emulated` disables pass-through and `./run.sh native` runs the host's native `minizip` directly.
+
+On non-x86_64 hosts, the emulated program still needs to be an x86_64 binary. The Docker image installs that as `minizip-x86_64`; the script uses `GUEST_MINIZIP` if set, otherwise it prefers `minizip-x86_64` and falls back to `minizip`.
 
 Expected output:
 

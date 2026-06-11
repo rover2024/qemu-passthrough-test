@@ -32,7 +32,7 @@ InvokeProc(ia)
 InvokeProc returns
 ```
 
-The two phases (`Call` / `Resume`) and the per-architecture context switch (`coroutine_start` / `coroutine_switch`, saving the callee-saved registers in [`RegState`](2-callback/host/Arch/x86_64/RegState_x86_64.h)) live in [`Invocation.cpp`](2-callback/host/Invocation.cpp). A LIFO stack of suspended invocations lets callbacks nest.
+The two phases (`Call` / `Resume`) and the per-architecture context switch (`coroutine_start` / `coroutine_switch`, saving the callee-saved registers in `host/Arch/*/RegState_*.h`) live in [`Invocation.cpp`](host/Invocation.cpp). The repository includes implementations for x86_64, aarch64, and riscv64 hosts; [`RegState_x86_64.h`](host/Arch/x86_64/RegState_x86_64.h) is one concrete example. A LIFO stack of suspended invocations lets callbacks nest.
 
 ## Build and Run
 

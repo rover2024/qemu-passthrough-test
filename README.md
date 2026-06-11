@@ -5,10 +5,9 @@ A worked example of **calling native host functions from inside a QEMU `linux-us
 1. The guest issues a single *magic* system call
 2. A tiny QEMU plugin (`passthrough.c`, in the QEMU tree under `contrib/plugins/`) intercepts it and performs the requested host-side operation — `dlopen`, `dlsym`, or "invoke this host function". On top of those few primitives the demos build something that looks, from the guest's point of view, like an ordinary library call.
 
-We submitted the syscall-filter plugin interface to QEMU at the end of 2025. This feature has been merged into the upstream version of QEMU. Now we hope to submit a plugin for implementing passthrough.
-
-The plugin `passthrough.c` is now in a downstream QEMU repository.
+The syscall-filter plugin interface has been merged upstream in QEMU. The pass-through plugin used here currently lives in a downstream QEMU branch:
 https://github.com/rover2024/qemu/blob/minimal-passthrough-plugin/contrib/plugins/passthrough.c
+
 
 This repository exists to make that mechanism **easy to understand and easy to try**, so it is split into layers that each add exactly one idea:
 
@@ -64,12 +63,17 @@ Build image:
 docker build -f docker/Dockerfile -t passthrough-image .
 ```
 
+If you are in a PRC network environment, use the USTC mirror during image build:
+```bash
+docker build --build-arg USE_USTC_MIRROR=1 -f docker/Dockerfile -t passthrough-image .
+```
+
 Run container:
 ```bash
 docker run --rm -it --name passthrough-container passthrough-image /bin/bash
 ```
 
-`QEMU_BUILD_DIR` will be set automatically in the container.
+The image copies this repository to `/home/user/qemu-passthrough-test`, builds the downstream QEMU tree under `/home/user/qemu`, and sets `QEMU_BUILD_DIR=/home/user/qemu/build/release`. It also handles non-x86_64 hosts by installing the x86_64 guest toolchain and the x86_64 `minizip` needed by `3-minizip`.
 
 ### Install Prerequisites Manually
 

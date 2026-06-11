@@ -6,8 +6,10 @@ ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG no_proxy
 ARG NO_PROXY
+ARG USE_USTC_MIRROR=0
 
 SHELL ["/bin/bash", "-lc"]
+ENV USE_USTC_MIRROR=${USE_USTC_MIRROR}
 
 COPY . /home/user/qemu-passthrough-test
 
