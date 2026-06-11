@@ -18,6 +18,8 @@ This repository exists to make that mechanism **easy to understand and easy to t
 | [`3-minizip/`](3-minizip/) | a **whole library**, auto-generated | drop-in **`libz.so`** → host **zlib** (runs a stock `minizip`) |
 | [`4-graphics/`](4-graphics/) | **two** libraries at once, a live GUI | drop-in **`libX11.so` + `libGL.so`** → host Xlib/OpenGL |
 
+The test cases use x86_64 as the guest architecture and support x86_64, arm64 and riscv64 Linux hosts.
+
 ---
 
 ## How pass-through works
