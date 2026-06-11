@@ -1,13 +1,16 @@
 #/bin/bash
 
-set -euo pipefail
-
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ARCHIVE="$SCRIPT_DIR/archive.bin"
 
-export QEMU=/home/overworld/Documents/rover2024/qemu2/build/release/qemu-x86_64
-export PLUGIN=/home/overworld/Documents/rover2024/qemu2/build/release/contrib/plugins/libpassthrough.so
-export LD_LIBRARY_PATH=$SCRIPT_DIR/build-host/lib
+if [[ ! -d "$QEMU_BUILD_DIR" ]]; then
+    echo "QEMU_BUILD_DIR not set. Please build QEMU first."
+    exit 1
+fi
+
+export QEMU=$QEMU_BUILD_DIR/qemu-x86_64
+export PLUGIN=$QEMU_BUILD_DIR/contrib/plugins/libpassthrough.so
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCRIPT_DIR/build-host/lib
 
 if [[ ! -f "$ARCHIVE" ]]; then
     python3 "$SCRIPT_DIR/GenerateArchive.py" "$ARCHIVE" 512M

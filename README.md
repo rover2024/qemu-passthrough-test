@@ -2,7 +2,13 @@
 
 A worked example of **calling native host functions from inside a QEMU `linux-user` guest program**, built on top of the syscall-filter plugin interface.
 
-The guest issues a single *magic* system call; a tiny QEMU plugin (`passthrough.c`, in the QEMU tree under `contrib/plugins/`) intercepts it and performs the requested host-side operation — `dlopen`, `dlsym`, or "invoke this host function". On top of those few primitives the demos build something that looks, from the guest's point of view, like an ordinary library call.
+1. The guest issues a single *magic* system call
+2. A tiny QEMU plugin (`passthrough.c`, in the QEMU tree under `contrib/plugins/`) intercepts it and performs the requested host-side operation — `dlopen`, `dlsym`, or "invoke this host function". On top of those few primitives the demos build something that looks, from the guest's point of view, like an ordinary library call.
+
+We submitted the syscall-filter plugin interface to QEMU at the end of 2025. This feature has been merged into the upstream version of QEMU. Now we hope to submit a plugin for implementing passthrough.
+
+The plugin `passthrough.c` is now in a downstream QEMU repository.
+https://github.com/rover2024/qemu/blob/minimal-passthrough-plugin/contrib/plugins/passthrough.c
 
 This repository exists to make that mechanism **easy to understand and easy to try**, so it is split into layers that each add exactly one idea:
 
@@ -12,45 +18,6 @@ This repository exists to make that mechanism **easy to understand and easy to t
 | [`2-callback/`](2-callback/) | host→guest **callbacks** (reentry) | `my_qsort` / `my_bsearch` → host **qsort/bsearch** |
 | [`3-minizip/`](3-minizip/) | a **whole library**, auto-generated | drop-in **`libz.so`** → host **zlib** (runs a stock `minizip`) |
 | [`4-graphics/`](4-graphics/) | **two** libraries at once, a live GUI | drop-in **`libX11.so` + `libGL.so`** → host Xlib/OpenGL |
-
-Start with `1-simple`, then `2-callback`, then `3-minizip`, then `4-graphics`.
-
----
-
-## Prerequisites
-
-* A QEMU built **with the syscall-filter plugin interface** and the `passthrough` plugin (`qemu_plugin_register_vcpu_syscall_filter_cb`). The filter interface is the upstream hook; `passthrough.c` is the plugin that uses it.
-* `cmake`, `ninja`, a C/C++ toolchain, and `zlib` development headers (for `1-simple`).
-* For `3-minizip`: `clang` (its generator parses `zlib.h`), the host `zlib` library, and a stock `minizip` binary — the demo runs the distribution's `/usr/bin/minizip` **unmodified**.
-
-Each layer ships two helper scripts. Edit the paths at the top of `run.sh` (`QEMU` and `PLUGIN`) to point at your QEMU build, then:
-
-```sh
-cd 1-simple
-./build.sh      # builds the guest program and the host libraries
-./run.sh        # runs the guest under QEMU with the plugin loaded
-```
-
-`build.sh` produces two trees:
-
-* `build-guest/bin/Program` — the guest executable (guest ISA, emulated).
-* `build-host/lib/lib*.so`  — the **host** runtime + demo libraries (native).
-
-`run.sh` is essentially:
-
-```sh
-LD_LIBRARY_PATH=build-host/lib \
-  qemu-x86_64 -plugin /path/to/libpassthrough.so  build-guest/bin/Program
-```
-
-Expected output (1-simple, abridged):
-
-```
-HostRuntime: initialized
-GuestRuntime: initialized
-zlib demo compressed 8388608 bytes to ... bytes
-zlib demo round-tripped successfully
-```
 
 ---
 
@@ -88,9 +55,134 @@ The plugin runs **inside the QEMU process**, in host address space. The demos pa
 
 ---
 
+## Setup Environment
+
+### Use Docker Container (Recommended)
+
+Build image:
+```bash
+docker build -f docker/Dockerfile -t passthrough-image .
+```
+
+Run container:
+```bash
+docker run --rm -it --name passthrough-container passthrough-image
+```
+
+`QEMU_BUILD_DIR` will be set automatically in the container.
+
+### Install Prerequisites Manually
+
+If you do not want to use the Docker container, you can install the prerequisites below manually.
+
+- Minizip 1.1
+- Zlib 1.2
+
+If you are on Ubuntu 22.04, you can install `zlib` and `minizip` with:
+```bash
+sudo apt install minizip zlib1g-dev
+```
+- GCC/G++
+- GNU Make
+
+If you are on a non-x86_64 system, you will need to install x86_64 compilers:
+```bash
+sudo apt install gcc-x86-64-linux-gnu g++-x86-64-linux-gnu
+```
+
+- QEMU (with `passthrough` plugin added)
+```bash
+git clone https://github.com/rover2024/qemu.git
+cd qemu
+git checkout minimal-passthrough-plugin
+
+mkdir -p build/release
+cd build/release
+../../configure --target-list=x86_64-linux-user \
+    --enable-plugins \
+    --python=python3
+cp compile_commands.json ..
+
+# run.sh requires it 
+export QEMU_BUILD_DIR=$(pwd)
+```
+
+---
+
+
+## Quick Start
+
+### `1-simple` — Borrowing the host's zlib
+
+[`1-simple/guest/Program.c`](1-simple/guest/Program.c) is an ordinary guest program: it fills an 8 MiB buffer, compresses it, decompresses it, and checks that the round-trip matches. It does this by calling three plain functions:
+
+```c
+size_t zcompress_compress_bound(size_t source_len);
+int    zcompress_compress(const void *src, size_t src_len, void *dst, size_t *dst_len, int level);
+int    zcompress_uncompress(const void *src, size_t src_len, void *dst, size_t *dst_len);
+```
+
+Here is the twist: **the guest binary contains no zlib at all.** Every `zcompress_*` call is forwarded across the pass-through boundary and actually run by the **host's** real zlib (`compressBound` / `compress2` / `uncompress`). The guest gets working compression without ever linking a compression library.
+
+The forwarding is two small halves you can read in a minute:
+
+* **guest side** — [`ZlibDemo.c`](1-simple/guest/ZlibDemo.c) packs each call's arguments and hands them to [`GuestRuntime.c`](1-simple/guest/GuestRuntime.c), which issues the magic syscall.
+* **host side** — [`ZlibDemoHost.c`](1-simple/host/ZlibDemoHost.c) receives the call, unpacks the arguments, and invokes the *real* host `compress2` / `uncompress` / `compressBound`.
+
+Build both halves:
+
+```sh
+cd 1-simple
+./build.sh
+```
+
+This compiles two separate trees:
+
+* `build-guest/bin/Program` — the guest program, run **under QEMU**.
+* `build-host/lib/*.so` — the host libraries the plugin loads natively: `libHostRuntime.so` (the pass-through runtime) and `libZlibDemoHost.so` (the adapters, linked against the real `-lz`).
+
+Run the demo:
+
+```sh
+./run.sh
+```
+
+All `run.sh` really does is launch the guest under QEMU with the plugin attached and the host libraries on the load path:
+
+```sh
+LD_LIBRARY_PATH=build-host/lib \
+    qemu-x86_64 -plugin libpassthrough.so  build-guest/bin/Program
+```
+
+Example output:
+
+```
+HostRuntime: initialized
+GuestRuntime: initialized
+zlib demo compressed 8388608 bytes to ... bytes
+zlib demo round-tripped successfully
+```
+
+The last two lines are the proof: the guest compressed 8 MiB and recovered it byte-for-byte — using a zlib that lives entirely on the host, reached one `zcompress_*` call at a time.
+
+
+### `2-callback` - Host-to-Guest Callbacks (Reentry)
+
+See [`2-callback/README.md`](2-callback/README.md).
+
+### `3-minizip` - Scaling to a whole library
+
+See [`3-minizip/README.md`](3-minizip/README.md).
+
+### `4-graphics` - Two libraries and a live GUI
+
+See [`4-graphics/README.md`](4-graphics/README.md).
+
+---
+
 ## Why two runtimes?
 
-The plugin is deliberately minimal and generic. To turn its six primitives into real library calls you need code on **both sides** of the syscall boundary:
+The plugin is deliberately minimal and generic. To turn its six primitives into real library calls you need code on **both sides** of the syscall boundary (For example, we want the guest program to invoke `qsort` or `compress2` in host libraries):
 
 ```
   ┌────────────────────────── guest (emulated, guest ISA) ────────────────────────────┐
@@ -122,112 +214,13 @@ The per-demo halves (`ZlibDemo`/`ZlibDemoHost`, `CallbackDemo`/`CallbackDemoHost
 To invoke a host function the guest fills an `InvocationArguments { proc, args, ret }` and calls `InvokeProc`. By convention `args` is an array of pointers, **`args[i]` points to the i-th argument**, and the host adapter reads each with one dereference. For example `zcompress_compress_bound`:
 
 ```c
-/* guest */                              /* host adapter */
-size_t n = ...;                          void __zcompress_compress_bound(void **args, void *ret) {
-void *args[] = { &n };                       size_t n = *(size_t *) args[0];
-InvocationArguments ia = {                   *(size_t *) ret = compressBound(n);
-    .proc = host_compress_bound,         }
-    .args = args, .ret = &result,
+/* guest */                                  /* host adapter */
+size_t n = ...;                              void __zcompress_compress_bound(void **args, void *ret) {
+void *args[] = { &n };                           size_t n = *(size_t *) args[0];
+InvocationArguments ia = {                       *(size_t *) ret = compressBound(n);
+    .proc = host_compress_bound,             }
+    .args = args,
+    .ret = &result,
 };
 InvokeProc(&ia);
 ```
-
----
-
-## How callbacks work (`2-callback`)
-
-`qsort`/`bsearch` take a **comparator** — a function the host routine calls back. Here the comparator lives in the *guest*. So mid-way through a host `qsort`, the host needs to run a guest function and use its result. The host call stack is deep inside `qsort` and cannot simply unwind, so the host **parks its entire call stack on a coroutine** and bounces control back to the guest.
-
-`InvokeProc` is therefore not a single syscall but a small loop:
-
-```
-guest                                   plugin            host (coroutine)
-─────                                   ──────            ────────────────
-InvokeProc(ia)
-  └─ syscall(InvokeProc, Call) ───────► CommonProcEntry
-                                          └─ invoke()
-                                               starts target on a new stack
-                                               e.g. qsort(... host trampoline ...)
-                                                        │ wants compare(a,b)
-   ◄── sysret 1, ReentryArguments ◄──── reenter():  park coroutine, switch back
-  while (sysret != 0):
-     run dispatcher → compare(a,b)        (a guest function runs here)
-     write result into ReentryArguments.ret
-  └─ syscall(InvokeProc, Resume) ──────► resume(): switch back into the coroutine
-                                          qsort resumes exactly where it paused
-                                                        │ … more comparisons …
-   ◄── sysret 0 (complete) ◄──────────── target returns, coroutine unwinds
-InvokeProc returns
-```
-
-The two phases (`Call` / `Resume`) and the per-architecture context switch (`coroutine_start` / `coroutine_switch`, saving the callee-saved registers in [`RegState`](2-callback/host/Arch/x86_64/RegState_x86_64.h)) live in [`Invocation.cpp`](2-callback/host/Invocation.cpp). A LIFO stack of suspended invocations lets callbacks nest.
-
-<!-- Two details worth noting in the demo:
-
-* **Dispatchers are registered once.** A *reentry dispatcher* is a guest stub that knows how to call a callback of a given signature (here: a comparator). The guest registers it with the host a single time, in its constructor, via a small `__initialize` call — so per-call arguments only need to carry the comparator itself, not the dispatcher.
-
-* **The comparator is passed out-of-band.** The C `qsort` comparator signature has no user-data pointer, so the host adapter stashes the current guest comparator in a `thread_local` and the host trampoline reads it back when `qsort` asks for a comparison. -->
-
----
-
-## Scaling to a whole library (`3-minizip`)
-
-The first two layers hand-write the glue for a handful of functions. Layer 3 asks the harder question: **can a stock, unmodified program run its library calls on the host?** Yes — and without touching the program.
-
-The target is the distribution's own `minizip`. We hand it a **drop-in `libz.so`** whose every exported symbol is a pass-through thunk: when `minizip` calls `compress2`, `deflate`, `gzopen`, … it actually reaches the *host's* real zlib. Because `minizip` is dynamically linked against `libz`, pointing the guest's `LD_LIBRARY_PATH` at our thunk library is all it takes — `minizip` never notices.
-
-```sh
-cd 3-minizip
-./build.sh                  # builds guest libz.so + host libZlibThunkHost.so
-./run.sh                    # runs a stock minizip under QEMU against the thunk libz
-```
-
-**The thunks are generated, not written.** [`GenerateSource.py`](3-minizip/GenerateSource.py) parses `zlib.h` with clang, reads the symbol list in [`Symbols.conf`](3-minizip/Symbols.conf), and emits both halves in the exact `2-callback` style:
-
-* [`guest/ZlibThunk.c`](3-minizip/guest/ZlibThunk.c) — one exported zlib symbol per function; each packs `args[]` and calls `InvokeProc`. Built into `libz.so`.
-* [`host/ZlibThunkHost.cpp`](3-minizip/host/ZlibThunkHost.cpp) — one `__<name>` adapter per function; each unpacks `args[]` and calls the **real** host zlib. Built into `libZlibThunkHost.so` (linked against the real `-lz`).
-
-Crucially, layer 3 adds **no new runtime** — it reuses `2-callback`'s `GuestRuntime`, `HostRuntime`, and the `Invocation` coroutine verbatim. Most of zlib (~80 functions) is pure data pass-through; the one function with host→guest callbacks, `inflateBack`, reuses the reentry loop. Its `in`/`out` callbacks are wrapped in a trampoline only when they are *guest* pointers — the adapter compares against `qemu_address` (the guest/host address-space boundary) and calls a host function pointer directly.
-
-<!-- Two things are deliberately out of scope — documented, not silently broken: the variadic `gzprintf`/`gzvprintf` (a generic marshaller can't forward varargs), and custom `z_stream` allocators (`zalloc`/`zfree` are assumed `Z_NULL`, so the host's default allocator is used). -->
-
----
-
-## Two libraries and a live GUI (`4-graphics`)
-
-Layer 3 redirected one batch library. Layer 4 does **two libraries at once — and a live, interactive window**: a small OpenGL program whose Xlib *and* OpenGL/GLX calls all run on the host.
-
-[`Program.cpp`](4-graphics/guest/Program.cpp) is a self-contained GLX + immediate-mode GL demo — glowing, spinning torus knots over a starfield. It opens a window with Xlib and draws with OpenGL, but it is built against **drop-in `libX11.so` and `libGL.so`**, so every `XCreateWindow`, `glBegin`, `glXSwapBuffers`, … is forwarded to the host's real Xlib/OpenGL and rendered on the host display.
-
-```sh
-cd 4-graphics
-./build.sh                  # guest: libX11.so + libGL.so + Program; host: the two adapter libs
-./run.sh                    # runs the program under QEMU
-```
-
-The same [`GenerateSource.py`](4-graphics/GenerateSource.py) produces **both** thunk pairs — one per `*Symbols.conf` — and reuses the `2-callback` runtime unchanged. Every function the program uses is **pure data pass-through** (no callbacks, no varargs), so this layer is mechanically the simplest: the generator emits one stub and one adapter per symbol, nothing more.
-
-What lets an unmodified windowing toolkit survive this is the shared address space:
-
-* Xlib's **macros** (`DefaultScreen`, `RootWindow`) and **struct fields** (`XVisualInfo`, `XEvent`) are read by the guest straight out of the host-owned structs — there is no symbol to thunk.
-* **Opaque host handles** — a `Display *`, an `XVisualInfo *`, a `GLXContext` — flow between the `libX11` and `libGL` thunks as plain values the guest never dereferences.
-
-<!-- --- -->
-
-<!-- ## Repository layout
-
-```
-passthrough.c                 the QEMU plugin (lives in the QEMU tree)
-
-<layer>/guest/                 compiled for the guest, run under QEMU
-   GuestRuntime.{c,h}            client stubs over syscall 4096
-   Arch/<arch>/Syscall_*.h       the raw `syscall` instruction per ISA
-   <Demo>.{c,h}                  per-demo guest glue
-   Program.c                     the test program / entry point
-
-<layer>/host/                  native libraries, loaded into the QEMU process
-   HostRuntime.{c,cpp}           __CommonProcEntry (+ coroutine glue in 2-callback)
-   <Demo>Host.{c,cpp}            per-demo host adapters (call the real lib)
-   Arch/<arch>/Coroutine_*.S     context switch, RegState_*.h   (2-callback only)
-   Invocation.{h,cpp}            Call/Resume/reenter coroutine API (2-callback only)
-``` -->
