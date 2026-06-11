@@ -1,6 +1,6 @@
 # `3-minizip` - Scaling to a whole library
 
-The first two layers hand-write the glue for a handful of functions. Layer 3 asks the harder question: **can a stock, unmodified program run its library calls on the host?** Yes — and without touching the program.
+Layer 3 asks the harder question: **can a stock, unmodified program run its library calls on the host?** Yes — and without touching the program.
 
 The target is the distribution's own `minizip`. We hand it a **drop-in `libz.so`** whose every exported symbol is a pass-through thunk: when `minizip` calls `compress2`, `deflate`, `gzopen`, … it actually reaches the *host's* real zlib. Because `minizip` is dynamically linked against `libz`, pointing the guest's `LD_LIBRARY_PATH` at our thunk library is all it takes — `minizip` never notices.
 
@@ -17,6 +17,7 @@ Crucially, layer 3 adds **no new runtime** — it reuses `2-callback`'s `GuestRu
 ## Build and Run
 
 ```sh
+cd 3-minizip
 ./build.sh
 ./run.sh
 ```

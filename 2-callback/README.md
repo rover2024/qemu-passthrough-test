@@ -37,6 +37,7 @@ The two phases (`Call` / `Resume`) and the per-architecture context switch (`cor
 ## Build and Run
 
 ```sh
+cd 2-callback
 ./build.sh
 ./run.sh
 ```

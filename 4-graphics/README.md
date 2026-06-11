@@ -1,4 +1,4 @@
-## `4-graphics` - Two libraries and a live GUI
+# `4-graphics` - Two libraries and a live GUI
 
 Layer 4 does **two libraries at once — and a live, interactive window**: a small OpenGL program whose Xlib *and* OpenGL/GLX calls all run on the host.
 
@@ -16,6 +16,7 @@ Layer 4 does **two libraries at once — and a live, interactive window**: a sma
 To run this demo, an available display is required.
 
 ```sh
+cd 4-graphics
 ./build.sh
 ./run.sh
 ```

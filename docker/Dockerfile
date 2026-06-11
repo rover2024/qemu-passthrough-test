@@ -1,5 +1,12 @@
 FROM ubuntu:22.04
 
+ARG http_proxy
+ARG https_proxy
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG no_proxy
+ARG NO_PROXY
+
 SHELL ["/bin/bash", "-lc"]
 
 COPY . /home/user/qemu-passthrough-test
