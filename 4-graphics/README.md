@@ -33,3 +33,8 @@ docker run --rm -it \
 ```
 
 Inside the container, run `cd 4-graphics && ./build.sh && ./run.sh`. Depending on your desktop security policy, you may also need to allow the container user to connect to the host X server.
+
+
+Expected output:
+
+![4-graphics](graphics-passthrough.png)
