@@ -230,3 +230,35 @@ InvocationArguments ia = {                       *(size_t *) ret = compressBound
 };
 InvokeProc(&ia);
 ```
+
+---
+
+## Why this matters?
+
+The syscall-filter interface — now merged upstream — together with the `passthrough` plugin form a small, **stable entry point** for *native pass-through* in QEMU `linux-user`: a guest can reach the host's real shared libraries instead of emulated copies. The plugin deliberately stops at a handful of primitives; it does not prescribe **how** pass-through is built on top of them. That part is open. Any QEMU `linux-user` user can grow their own marshalling, calling conventions, and library coverage out of those same few interfaces.
+
+What you find in this repository is just **one reference implementation** of that "how": a pair of guest/host thunk libraries plus two small runtimes. With nothing more than that, it already runs a complete, unmodified `minizip`.
+
+And it reaches much further than these demos suggest: on top of the very same plugin, this approach already runs real **OpenGL and Vulkan games** — their graphics calls passed straight through to the host GPU.
+
+### Example: Run x86_64 SupertuxKart on ARM64
+
+![SupertuxKart](images/supertuxkart.png)
+
+https://www.mediafire.com/file/6pgikucgs1cm5xv/run-supertuxkart-nvidia-spark.mp4/file
+
+### Example: Run x86_64 Hollow Knight on ARM64
+
+![HollowKnight](images/hollowknight.png)
+
+https://www.mediafire.com/file/g63qcnxcr50s62t/run-hollowknight-nvidia-agx.mp4/file
+
+---
+
+## KVM Forum 2025 Talk
+
+**Lorelei: Enable QEMU to Leverage Native Shared Libraries**
+
+![Lorelei: Enable QEMU to Leverage Native Shared Libraries](https://img.youtube.com/vi/_jioQFm7wyU/hqdefault.jpg)
+
+https://www.youtube.com/watch?v=_jioQFm7wyU
