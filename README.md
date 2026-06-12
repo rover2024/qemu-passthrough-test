@@ -3,7 +3,7 @@
 A worked example of **calling native host functions from inside a QEMU `linux-user` guest program**, built on top of the syscall-filter plugin interface.
 
 1. The guest issues a single *magic* system call
-2. A tiny QEMU plugin (`passthrough.c`, in the QEMU tree under `contrib/plugins/`) intercepts it and performs the requested host-side operation — `dlopen`, `dlsym`, or "invoke this host function". On top of those few primitives the demos build something that looks, from the guest's point of view, like an ordinary library call.
+2. A tiny QEMU plugin (`passthrough.c`, in the QEMU tree under `contrib/plugins/`) intercepts it and performs the requested host-side operation: `dlopen`, `dlsym`, or "invoke this host function". On top of those few primitives the demos build something that looks, from the guest's point of view, like an ordinary library call.
 
 The syscall-filter plugin interface has been merged upstream in QEMU. The pass-through plugin used here currently lives in a downstream QEMU branch:
 https://github.com/rover2024/qemu/blob/minimal-passthrough-plugin/contrib/plugins/passthrough.c
@@ -48,11 +48,11 @@ The whole ABI is six primitives:
 | `GetLibraryError`  | `*out`                         | `dlerror`                            |
 | `InvokeProc`       | `proc`, `arg1`, `arg2`         | call `proc(arg1, arg2)` natively     |
 
-That is the *entire* surface exposed to the guest. Notice the plugin knows nothing about zlib, qsort, or calling conventions — only "load a library", "find a symbol", and "call a `void(void*, void*)` function". Everything ergonomic is built on top of these by the two runtimes (below).
+That is the *entire* surface exposed to the guest. Notice the plugin knows nothing about zlib, qsort, or calling conventions. It can only "load a library", "find a symbol", and "call a `void(void*, void*)` function". The more involved work, like marshalling each call's arguments into the host calling convention and routing its return value back, is layered on top of these primitives by the two runtimes (below).
 
 ### 2. Why the plugin can touch guest pointers
 
-The plugin runs **inside the QEMU process**, in host address space. The demos pass ordinary pointers (a buffer to compress, an array to sort) straight through the magic syscall and the host dereferences them directly. This works because the examples assume the guest and host share an address space (identity-mapped, `guest_base == 0`) — the simple case that keeps the demos readable. Opaque values produced by the host (a `dlopen` handle, a resolved function address) are just shuttled back and forth by the guest without interpretation.
+The plugin runs **inside the QEMU process**, in host address space. The demos pass ordinary pointers (a buffer to compress, an array to sort) straight through the magic syscall and the host dereferences them directly. This works because the examples assume the guest and host share an address space (identity-mapped, `guest_base == 0`), the simple case that keeps the demos readable. Opaque values produced by the host (a `dlopen` handle, a resolved function address) are just shuttled back and forth by the guest without interpretation.
 
 ---
 
@@ -118,7 +118,7 @@ export QEMU_BUILD_DIR=$(pwd)
 
 ## Quick Start
 
-### `1-simple` — Borrowing the host's zlib
+### `1-simple`: Borrowing the host's zlib
 
 [`1-simple/guest/Program.c`](1-simple/guest/Program.c) is an ordinary guest program: it fills an 8 MiB buffer, compresses it, decompresses it, and checks that the round-trip matches. It does this by calling three plain functions:
 
@@ -132,8 +132,8 @@ Here is the twist: **the guest binary contains no zlib at all.** Every `zcompres
 
 The forwarding is two small halves you can read in a minute:
 
-* **guest side** — [`ZlibDemo.c`](1-simple/guest/ZlibDemo.c) packs each call's arguments and hands them to [`GuestRuntime.c`](1-simple/guest/GuestRuntime.c), which issues the magic syscall.
-* **host side** — [`ZlibDemoHost.c`](1-simple/host/ZlibDemoHost.c) receives the call, unpacks the arguments, and invokes the *real* host `compress2` / `uncompress` / `compressBound`.
+* **guest side**: [`ZlibDemo.c`](1-simple/guest/ZlibDemo.c) packs each call's arguments and hands them to [`GuestRuntime.c`](1-simple/guest/GuestRuntime.c), which issues the magic syscall.
+* **host side**: [`ZlibDemoHost.c`](1-simple/host/ZlibDemoHost.c) receives the call, unpacks the arguments, and invokes the *real* host `compress2` / `uncompress` / `compressBound`.
 
 Build both halves:
 
@@ -144,8 +144,8 @@ cd 1-simple
 
 This compiles two separate trees:
 
-* `build-guest/bin/Program` — the guest program, run **under QEMU**.
-* `build-host/lib/*.so` — the host libraries the plugin loads natively: `libHostRuntime.so` (the pass-through runtime) and `libZlibDemoHost.so` (the adapters, linked against the real `-lz`).
+* `build-guest/bin/Program`: the guest program, run **under QEMU**.
+* `build-host/lib/*.so`: the host libraries the plugin loads natively, namely `libHostRuntime.so` (the pass-through runtime) and `libZlibDemoHost.so` (the adapters, linked against the real `-lz`).
 
 Run the demo:
 
@@ -157,7 +157,7 @@ All `run.sh` really does is launch the guest under QEMU with the plugin attached
 
 ```sh
 LD_LIBRARY_PATH=build-host/lib \
-    qemu-x86_64 -plugin libpassthrough.so  build-guest/bin/Program
+    qemu-x86_64 -plugin libpassthrough.so build-guest/bin/Program
 ```
 
 Example output:
@@ -169,7 +169,7 @@ zlib demo compressed 8388608 bytes to ... bytes
 zlib demo round-tripped successfully
 ```
 
-The last two lines are the proof: the guest compressed 8 MiB and recovered it byte-for-byte — using a zlib that lives entirely on the host, reached one `zcompress_*` call at a time.
+The last two lines are the proof: the guest compressed 8 MiB and recovered it byte-for-byte, using a zlib that lives entirely on the host and is reached one `zcompress_*` call at a time.
 
 
 ### `2-callback` - Host-to-Guest Callbacks (Reentry)
@@ -209,7 +209,7 @@ The plugin is deliberately minimal and generic. To turn its six primitives into 
   └───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-* **GuestRuntime** (compiled into the guest, guest ISA) is the **client**. It wraps the magic syscall into friendly C functions (`LoadLibrary`, `GetProcAddress`, `InvokeProc`, …). The guest cannot call a host function directly — different ISA, different link namespace — so it marshals everything into syscall `4096`.
+* **GuestRuntime** (compiled into the guest, guest ISA) is the **client**. It wraps the magic syscall into friendly C functions (`LoadLibrary`, `GetProcAddress`, `InvokeProc`, …). The guest cannot call a host function directly (different ISA, different link namespace), so it marshals everything into syscall `4096`.
 
 * **HostRuntime** (a native `.so`, loaded into the QEMU process via the plugin's own `dlopen`) is the **server entry**. The plugin's `invoke_proc` only knows the primitive `void(void*, void*)` shape, so it always calls one host function: `__CommonProcEntry`. That host function unpacks the real arguments and dispatches to the actual native target. In `2-callback`, HostRuntime also owns the coroutine machinery that makes callbacks possible.
 
@@ -235,11 +235,11 @@ InvokeProc(&ia);
 
 ## Why this matters?
 
-The syscall-filter interface — now merged upstream — together with the `passthrough` plugin form a small, **stable entry point** for *native pass-through* in QEMU `linux-user`: a guest can reach the host's real shared libraries instead of emulated copies. The plugin deliberately stops at a handful of primitives; it does not prescribe **how** pass-through is built on top of them. That part is open. Any QEMU `linux-user` user can grow their own marshalling, calling conventions, and library coverage out of those same few interfaces.
+The syscall-filter interface, now merged upstream, together with the `passthrough` plugin form a small, **stable entry point** for *native pass-through* in QEMU `linux-user`: a guest can reach the host's real shared libraries instead of emulated copies. The plugin deliberately stops at a handful of primitives; it does not prescribe **how** pass-through is built on top of them. That part is open. Any QEMU `linux-user` user can grow their own marshalling, calling conventions, and library coverage out of those same few interfaces.
 
 What you find in this repository is just **one reference implementation** of that "how": a pair of guest/host thunk libraries plus two small runtimes. With nothing more than that, it already runs a complete, unmodified `minizip`.
 
-And it reaches much further than these demos suggest: on top of the very same plugin, this approach already runs real **OpenGL and Vulkan games** — their graphics calls passed straight through to the host GPU.
+And it reaches much further than these demos suggest: on top of the very same plugin, this approach already runs real **OpenGL and Vulkan games**, with their graphics calls passed straight through to the host GPU.
 
 ### Example: Run x86_64 SupertuxKart on ARM64
 

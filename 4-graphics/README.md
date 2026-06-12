@@ -1,6 +1,6 @@
-# `4-graphics` - Two libraries and a live GUI
+# `4-graphics`: Two libraries and a live GUI
 
-Layer 4 does **two libraries at once — and a live, interactive window**: a small OpenGL program whose Xlib *and* OpenGL/GLX calls all run on the host.
+Layer 4 does **two libraries at once, and a live, interactive window**: a small OpenGL program whose Xlib *and* OpenGL/GLX calls all run on the host.
 
 [`Program.cpp`](guest/Program.cpp) is a self-contained GLX + immediate-mode GL demo — glowing, spinning torus knots over a starfield. It opens a window with Xlib and draws with OpenGL, but it is built against **drop-in `libX11.so` and `libGL.so`**, so every `XCreateWindow`, `glBegin`, `glXSwapBuffers`, … is forwarded to the host's real Xlib/OpenGL and rendered on the host display.
 
@@ -39,4 +39,4 @@ Inside the container, run `cd 4-graphics && ./build.sh && ./run.sh`. Depending o
 
 Expected output:
 
-![4-graphics](graphics-passthrough.png)
+![4-graphics](../images/graphics-passthrough.png)

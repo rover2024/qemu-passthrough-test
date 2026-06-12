@@ -1,6 +1,6 @@
-# `2-callback` - Host-to-Guest Callbacks (Reentry)
+# `2-callback`: Host-to-Guest Callbacks (Reentry)
 
-`qsort`/`bsearch` take a **comparator** — a function the host routine calls back. Here the comparator lives in the *guest*. So mid-way through a host `qsort`, the host needs to run a guest function and use its result. The host call stack is deep inside `qsort` and cannot simply unwind, so the host **parks its entire call stack on a coroutine** and bounces control back to the guest.
+`qsort`/`bsearch` take a **comparator**, a function the host routine calls back. Here the comparator lives in the *guest*. So mid-way through a host `qsort`, the host needs to run a guest function and use its result. The host call stack is deep inside `qsort` and cannot simply unwind, so the host **parks its entire call stack on a coroutine** and bounces control back to the guest.
 
 ```c++
 void my_qsort(void *base, size_t nmemb, size_t size,

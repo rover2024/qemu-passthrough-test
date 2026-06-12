@@ -1,4 +1,4 @@
-# `3-minizip` - Scaling to a whole library
+# `3-minizip`: Scaling to a whole library
 
 Layer 3 asks the harder question: **can a stock, unmodified program run its library calls on the host?** Yes — and without touching the program.
 
@@ -11,7 +11,7 @@ The target is the distribution's own `minizip`. We hand it a **drop-in `libz.so`
 * [`guest/ZlibThunk.c`](guest/ZlibThunk.c) — one exported zlib symbol per function; each packs `args[]` and calls `InvokeProc`. Built into `libz.so`.
 * [`host/ZlibThunkHost.cpp`](host/ZlibThunkHost.cpp) — one `__<name>` adapter per function; each unpacks `args[]` and calls the **real** host zlib. Built into `libZlibThunkHost.so` (linked against the real `-lz`).
 
-Crucially, layer 3 adds **no new runtime** — it reuses `2-callback`'s `GuestRuntime`, `HostRuntime`, and the `Invocation` coroutine verbatim. Most of zlib (~80 functions) is pure data pass-through; the one function with host→guest callbacks, `inflateBack`, reuses the reentry loop. Its `in`/`out` callbacks are wrapped in a trampoline only when they are *guest* pointers — the adapter compares against `qemu_address` (the guest/host address-space boundary) and calls a host function pointer directly.
+Crucially, layer 3 adds **no new runtime**. It reuses `2-callback`'s `GuestRuntime`, `HostRuntime`, and the `Invocation` coroutine verbatim. Most of zlib (~80 functions) is pure data pass-through; the one function with host→guest callbacks, `inflateBack`, reuses the reentry loop. Its `in`/`out` callbacks are wrapped in a trampoline only when they are *guest* pointers — the adapter compares against `qemu_address` (the guest/host address-space boundary) and calls a host function pointer directly.
 
 
 ## Build and Run
