@@ -21,7 +21,11 @@ cd 4-graphics
 ./run.sh
 ```
 
-You should see a window with a spinning torus knot over a starfield.
+Expected output:
+
+![4-graphics](../images/graphics-passthrough.png)
+
+### Run in Docker Container
 
 A minimal Docker run command for an X11 desktop looks like this:
 
@@ -34,9 +38,10 @@ docker run --rm -it \
     passthrough-image /bin/bash
 ```
 
-Inside the container, run `cd 4-graphics && ./build.sh && ./run.sh`. Depending on your desktop security policy, you may also need to allow the container user to connect to the host X server.
+Depending on your desktop security policy, you may also need to allow the container user to connect to the host X server.
 
+If it exits with an X authorization error and cannot open the display, your X server is refusing the connection. Re-running through `sudo` while keeping your environment usually fixes it:
 
-Expected output:
-
-![4-graphics](../images/graphics-passthrough.png)
+```sh
+sudo -E ./run.sh
+```
