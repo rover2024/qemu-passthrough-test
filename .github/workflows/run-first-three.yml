@@ -1,0 +1,56 @@
+name: Run first three demos
+
+# Manual-only: this never runs on push. Trigger it from the GitHub UI
+# (Actions tab -> "Run first three demos" -> "Run workflow").
+on:
+  workflow_dispatch:
+
+jobs:
+  demos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f docker/Dockerfile -t passthrough-image .
+
+      - name: Run 1-simple, 2-callback, 3-minizip
+        id: run
+        run: |
+          set -o pipefail
+          docker run --rm passthrough-image bash run-first-three.sh 2>&1 | tee run.log
+
+      - name: Publish summary
+        if: always()
+        run: |
+          # The script auto-disables colour when stdout is not a TTY, but strip
+          # any stray ANSI codes just in case so the summary renders cleanly.
+          clean="$(sed -r 's/\x1b\[[0-9;]*m//g' run.log)"
+
+          if [ "${{ steps.run.outcome }}" = "success" ]; then
+            status="✅ All three demos passed"
+          else
+            status="❌ Demos failed — see the log below"
+          fi
+
+          {
+            echo "## QEMU pass-through — first three demos"
+            echo
+            echo "$status"
+            echo
+            echo "### Result"
+            echo '```text'
+            echo "$clean" | sed -n '/:: Summary/,$p'
+            echo '```'
+            echo
+            echo "<details><summary>Full build &amp; run log</summary>"
+            echo
+            echo '```text'
+            echo "$clean"
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"

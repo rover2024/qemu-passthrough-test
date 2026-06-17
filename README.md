@@ -118,6 +118,17 @@ export QEMU_BUILD_DIR=$(pwd)
 
 ## Quick Start
 
+### Run the first three demos in one shot
+
+If you just want to see it work, build the image and let [`run-first-three.sh`](run-first-three.sh) build and run `1-simple`, `2-callback`, and `3-minizip` for you (the last one is packed three ways — `native`, `passthrough`, `emulated` — with a timing comparison):
+
+```bash
+docker build -f docker/Dockerfile -t passthrough-image .
+docker run --rm passthrough-image bash run-first-three.sh
+```
+
+The container already has QEMU built and `QEMU_BUILD_DIR` set, so the run exits on its own with a per-demo summary. To run a single demo by hand instead, follow the per-layer steps below.
+
 ### `1-simple`: Borrowing the host's zlib
 
 [`1-simple/guest/Program.c`](1-simple/guest/Program.c) is an ordinary guest program: it fills an 8 MiB buffer, compresses it, decompresses it, and checks that the round-trip matches. It does this by calling three plain functions:
