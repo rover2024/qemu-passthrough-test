@@ -1,4 +1,4 @@
-# QEMU Pass-Through Test
+# QEMU User Program Calls Host Functions
 
 [![x86_64](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-x86_64.yml/badge.svg)](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-x86_64.yml)
 [![arm64](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-arm64.yml/badge.svg)](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-arm64.yml)
@@ -18,7 +18,7 @@ This repository exists to make that mechanism **easy to understand and easy to t
 | Layer | Adds | Guest-visible API |
 |-------|------|-------------------|
 | [`1-simple/`](1-simple/)   | the bare pass-through path | `zcompress_*` → host **zlib** |
-| [`2-callback/`](2-callback/) | host→guest **callbacks** (reentry) | `my_qsort` / `my_bsearch` → host **qsort/bsearch** |
+| [`2-callback/`](2-callback/) | host→guest **callbacks** (function pointers) | `my_qsort` / `my_bsearch` → host **qsort/bsearch** |
 | [`3-minizip/`](3-minizip/) | a **whole library**, auto-generated | drop-in **`libz.so`** → host **zlib** (runs a stock `minizip`) |
 | [`4-graphics/`](4-graphics/) | **two** libraries at once, a live GUI | drop-in **`libX11.so` + `libGL.so`** → host Xlib/OpenGL |
 
