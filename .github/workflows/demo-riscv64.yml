@@ -1,0 +1,67 @@
+name: riscv64
+
+# Self-hosted runner (labels: self-hosted, linux, riscv64). Standalone (not the
+# reusable hosted workflow) because riscv64 differs: no JS actions (there is no
+# Node 20 for riscv64, so checkout is a plain git clone) and the build is driven
+# through the runner's proxy. Start the runner with the proxy in its environment
+# (e.g. `source ~/setup-proxy.sh && ./run.sh`) so git/docker can reach the network.
+on:
+  workflow_dispatch:
+
+jobs:
+  riscv64:
+    name: demo (riscv64)
+    runs-on: [self-hosted, linux, riscv64]
+    timeout-minutes: 120
+    steps:
+      - name: Powered by UltraRISC
+        run: |
+          model="$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || true)"; : "${model:=RISC-V board}"
+          isa="$(awk -F': ' '/^isa/{print $2; exit}' /proc/cpuinfo)"
+          mem="$(awk '/MemTotal/{printf "%.0f GiB", $2/1048576}' /proc/meminfo)"
+          khz="$(cat /sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_max_freq 2>/dev/null | sort -rn | head -1)"
+          ghz="?"; [ -n "$khz" ] && ghz="$(awk -v k="$khz" 'BEGIN{printf "%.1f GHz", k/1000000}')"
+          {
+            echo "### 🚀 riscv64 CI runs on real RISC-V silicon — powered by **UltraRISC**"
+            echo
+            echo "The host side is **not emulated**: the x86_64 guest is passed straight through to the native libraries of a genuine UltraRISC board."
+            echo
+            echo "| | |"
+            echo "|--|--|"
+            echo "| Board | \`$model\` |"
+            echo "| Cores | $(nproc) × RV64 @ $ghz |"
+            echo "| ISA | \`$isa\` |"
+            echo "| Memory | $mem |"
+            echo "| Kernel | \`$(uname -sr)\` |"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout (shell clone — no Node needed on riscv64)
+        run: |
+          rm -rf repo
+          git clone --depth 1 -b "${{ github.ref_name }}" \
+            "${{ github.server_url }}/${{ github.repository }}.git" repo
+
+      - name: Build Docker image (forward proxy to the build)
+        working-directory: repo
+        run: |
+          docker build \
+            --build-arg http_proxy="$http_proxy"   --build-arg https_proxy="$https_proxy" \
+            --build-arg HTTP_PROXY="$http_proxy"    --build-arg HTTPS_PROXY="$https_proxy" \
+            -f docker/Dockerfile -t passthrough-image .
+
+      - name: Run 1-simple, 2-callback, 3-minizip
+        id: run
+        working-directory: repo
+        run: |
+          set -o pipefail
+          docker run --rm passthrough-image bash run-first-three.sh 2>&1 | tee "$GITHUB_WORKSPACE/run.log"
+
+      - name: Publish summary
+        if: always()
+        run: |
+          s='❌ failed'; [ "${{ steps.run.outcome }}" = success ] && s='✅ passed'
+          echo "## first-three demos — riscv64: $s" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f run.log ]; then
+            { echo '```text'; sed -r 's/\x1b\[[0-9;]*m//g' run.log | sed -n '/:: Summary/,$p'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi

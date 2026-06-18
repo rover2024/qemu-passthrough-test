@@ -1,6 +1,8 @@
 # QEMU Pass-Through Test
 
-[![Run first three demos](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/run-first-three.yml/badge.svg?branch=qemu-cross-build)](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/run-first-three.yml)
+[![x86_64](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-x86_64.yml/badge.svg)](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-x86_64.yml)
+[![arm64](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-arm64.yml/badge.svg)](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-arm64.yml)
+[![riscv64](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-riscv64.yml/badge.svg)](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/demo-riscv64.yml)
 
 A worked example of **calling native host functions from inside a QEMU `linux-user` guest program**, built on top of the syscall-filter plugin interface.
 

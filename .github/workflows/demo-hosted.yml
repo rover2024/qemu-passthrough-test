@@ -1,0 +1,40 @@
+name: demo (hosted, reusable)
+
+# Shared build+run steps for the GitHub-hosted architectures (x86_64, arm64).
+# Called by demo-x86_64.yml / demo-arm64.yml so each gets its own status badge.
+on:
+  workflow_call:
+    inputs:
+      arch:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+
+jobs:
+  demo:
+    name: demo (${{ inputs.arch }})
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f docker/Dockerfile -t passthrough-image .
+
+      - name: Run 1-simple, 2-callback, 3-minizip
+        id: run
+        run: |
+          set -o pipefail
+          docker run --rm passthrough-image bash run-first-three.sh 2>&1 | tee run.log
+
+      - name: Publish summary
+        if: always()
+        run: |
+          s='❌ failed'; [ "${{ steps.run.outcome }}" = success ] && s='✅ passed'
+          echo "## first-three demos — ${{ inputs.arch }}: $s" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f run.log ]; then
+            { echo '```text'; sed -r 's/\x1b\[[0-9;]*m//g' run.log | sed -n '/:: Summary/,$p'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
