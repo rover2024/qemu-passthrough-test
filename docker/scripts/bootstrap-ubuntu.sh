@@ -145,21 +145,34 @@ setup_x86_64_sysroot_qemu() {
     #    code: `debootstrap --foreign` downloads + unpacks the base and caches
     #    the --include debs; we extract those ourselves with dpkg-deb (the
     #    normal second stage would need to run amd64 maintainer scripts).
-    # Retry: one transient mirror/proxy download blip makes debootstrap abort
-    # the whole bootstrap (e.g. "E: Couldn't download packages: libmagic1"), so
-    # give it a few clean attempts before giving up.
-    for attempt in 1 2 3; do
+    # The amd64 packages come over the network (a flaky proxy in CI), and
+    # debootstrap aborts the WHOLE run if any single package download fails
+    # ("E: Couldn't download packages: ..."), a different one each time. Harden
+    # on two levels:
+    #   - make wget retry each file hard, including on proxy 5xx responses
+    #     (wget does not retry HTTP errors by default), and
+    #   - retry the whole debootstrap several times for whatever still slips.
+    cat >>/etc/wgetrc <<'EOF'
+tries = 20
+timeout = 30
+waitretry = 10
+retry_connrefused = on
+retry_on_http_error = 429,500,502,503,504
+EOF
+    deboot_ok=0
+    for attempt in $(seq 1 10); do
         rm -rf "$GUEST_SYSROOT"
         if debootstrap --foreign --arch=amd64 --variant=minbase \
                 --components=main,universe \
                 --include=build-essential,libc6-dev,zlib1g-dev,libminizip-dev,minizip \
                 "$UBUNTU_CODENAME" "$GUEST_SYSROOT" "$UBUNTU_MIRROR"; then
+            deboot_ok=1
             break
         fi
-        echo "[bootstrap] debootstrap attempt ${attempt}/3 failed; retrying" >&2
-        [ "$attempt" = 3 ] && { echo "[bootstrap] debootstrap failed after 3 attempts" >&2; exit 1; }
+        echo "[bootstrap] debootstrap attempt ${attempt}/10 failed; retrying" >&2
         sleep 5
     done
+    [ "$deboot_ok" = 1 ] || { echo "[bootstrap] debootstrap failed after 10 attempts" >&2; exit 1; }
     for deb in "$GUEST_SYSROOT"/var/cache/apt/archives/*.deb; do
         dpkg-deb -x "$deb" "$GUEST_SYSROOT"
     done
