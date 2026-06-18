@@ -1,5 +1,7 @@
 # QEMU Pass-Through Test
 
+[![Run first three demos](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/run-first-three.yml/badge.svg?branch=qemu-cross-build)](https://github.com/rover2024/qemu-passthrough-test/actions/workflows/run-first-three.yml)
+
 A worked example of **calling native host functions from inside a QEMU `linux-user` guest program**, built on top of the syscall-filter plugin interface.
 
 1. The guest issues a single *magic* system call
