@@ -145,11 +145,21 @@ setup_x86_64_sysroot_qemu() {
     #    code: `debootstrap --foreign` downloads + unpacks the base and caches
     #    the --include debs; we extract those ourselves with dpkg-deb (the
     #    normal second stage would need to run amd64 maintainer scripts).
-    rm -rf "$GUEST_SYSROOT"
-    debootstrap --foreign --arch=amd64 --variant=minbase \
-        --components=main,universe \
-        --include=build-essential,libc6-dev,zlib1g-dev,libminizip-dev,minizip,file \
-        "$UBUNTU_CODENAME" "$GUEST_SYSROOT" "$UBUNTU_MIRROR"
+    # Retry: one transient mirror/proxy download blip makes debootstrap abort
+    # the whole bootstrap (e.g. "E: Couldn't download packages: libmagic1"), so
+    # give it a few clean attempts before giving up.
+    for attempt in 1 2 3; do
+        rm -rf "$GUEST_SYSROOT"
+        if debootstrap --foreign --arch=amd64 --variant=minbase \
+                --components=main,universe \
+                --include=build-essential,libc6-dev,zlib1g-dev,libminizip-dev,minizip \
+                "$UBUNTU_CODENAME" "$GUEST_SYSROOT" "$UBUNTU_MIRROR"; then
+            break
+        fi
+        echo "[bootstrap] debootstrap attempt ${attempt}/3 failed; retrying" >&2
+        [ "$attempt" = 3 ] && { echo "[bootstrap] debootstrap failed after 3 attempts" >&2; exit 1; }
+        sleep 5
+    done
     for deb in "$GUEST_SYSROOT"/var/cache/apt/archives/*.deb; do
         dpkg-deb -x "$deb" "$GUEST_SYSROOT"
     done
